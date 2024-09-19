@@ -21,30 +21,22 @@ async function initializeDb() {
   return db;
 }
 
-// Function to search for media (movies or TV shows)
-export async function searchMedia(query, mediaType = 'movie') {
-  const url = `${TMDB_BASE_URL}/search/${mediaType}`;
-  const params = {
-    api_key: API_KEY,
-    query: query,
-  };
-
-  try {
-    console.log(`Searching for ${mediaType}: ${query}`);
-    console.log(`Making request to: ${url}`);
-    console.log(`With API key: ${API_KEY}`);
-
-    const response = await axios.get(url, { params });
-    return response.data.results || [];
-  } catch (error) {
-    console.error('Error searching media:', error.message);
-    if (error.response) {
-      console.error('Response status:', error.response.status);
-      console.error('Response data:', error.response.data);
+// Function to perform a unified search (movies, TV shows, people)
+export async function searchMedia(query) {
+    const url = `${TMDB_BASE_URL}/search/multi`;
+    const params = {
+      api_key: API_KEY,
+      query: query,
+    };
+  
+    try {
+      const response = await axios.get(url, { params });
+      return response.data.results || [];
+    } catch (error) {
+      console.error('Error searching media:', error.message);
+      return [];
     }
-    return [];
   }
-}
 
 // Function to get data from cache
 async function getFromCache(mediaId, mediaType) {

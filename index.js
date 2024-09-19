@@ -2,10 +2,10 @@ import { Command } from 'commander';
 import inquirer from 'inquirer';
 import { searchMedia, getWatchProviders } from './api.js';
 import { expandCountryList, COUNTRY_CONTINENT_ORDER } from './utils.js';
-import { getSeasonsAvailability } from './seasonutils.js';  // Ensure this matches the actual file name
+import { getSeasonsAvailability } from './seasonutils.js'; 
+import { requestMedia } from './jellyseerr.js';
 import dotenv from 'dotenv';
 dotenv.config();
-
 
 const TARGET_PROVIDERS = ['Netflix', 'Disney Plus', 'HBO Max', 'Amazon Prime Video'];
 
@@ -13,18 +13,15 @@ const program = new Command();
 
 program
   .version('1.0.0')
-  .option('-t, --type <type>', 'Media type (movie or tv)', 'movie')
   .arguments('<query>')
-  .action(async (query, options) => {
-    const mediaType = options.type;
-    await searchAndDisplayMedia(query, mediaType);
+  .action(async (query) => {
+    await searchAndDisplayMedia(query);
   });
 
 program.parse(process.argv);
 
-
-async function searchAndDisplayMedia(query, mediaType) {
-  const results = await searchMedia(query, mediaType);
+async function searchAndDisplayMedia(query) {
+  const results = await searchMedia(query);
 
   if (!results.length) {
     console.log('No results found.');
@@ -35,27 +32,29 @@ async function searchAndDisplayMedia(query, mediaType) {
   const choices = results.map((item, index) => {
     const title = item.title || item.name;
     const releaseDate = item.release_date || item.first_air_date || 'Unknown';
+    const mediaType = item.media_type;  // movie, tv, person (filter out 'person')
     return {
-      name: `${title} (${releaseDate})`,
-      value: index,
+      name: `${title} (${releaseDate}) [${mediaType}]`,
+      value: { index, mediaType },
     };
   });
 
-  const { selectedIndex } = await inquirer.prompt([
+  const { selectedMedia } = await inquirer.prompt([
     {
       type: 'list',
-      name: 'selectedIndex',
+      name: 'selectedMedia',
       message: 'Select the correct media:',
-      choices,
+      choices: choices.filter(choice => choice.value.mediaType !== 'person'),
     },
   ]);
 
-  const selectedMedia = results[selectedIndex];
-  const mediaId = selectedMedia.id;
-  const title = selectedMedia.title || selectedMedia.name;
-  const overview = selectedMedia.overview;
-  const posterPath = selectedMedia.poster_path
-    ? `https://image.tmdb.org/t/p/w500${selectedMedia.poster_path}`
+  const media = results[selectedMedia.index];
+  const mediaId = media.id;
+  const mediaType = selectedMedia.mediaType;
+  const title = media.title || media.name;
+  const overview = media.overview;
+  const posterPath = media.poster_path
+    ? `https://image.tmdb.org/t/p/w500${media.poster_path}`
     : 'N/A';
 
   console.log(`\nTitle: ${title}`);
@@ -77,18 +76,13 @@ async function searchAndDisplayMedia(query, mediaType) {
     );
 
     if (seasonsAvailability.length) {
-      // Prioritize based on the number of seasons available
       seasonsAvailability.sort((a, b) => {
-        // Priority based on country order and number of seasons
         const countryPriority =
           countryOrder.indexOf(a.Country) - countryOrder.indexOf(b.Country);
         if (countryPriority !== 0) return countryPriority;
-
-        // More seasons available
         return b.SeasonsAvailable.length - a.SeasonsAvailable.length;
       });
 
-      // Display the results
       console.log('Available seasons on the following providers:\n');
       seasonsAvailability.forEach((item) => {
         console.log(
@@ -101,7 +95,6 @@ async function searchAndDisplayMedia(query, mediaType) {
       console.log('No seasons availability information found.');
     }
   } else {
-    // For movies, display regular availability
     const availability = [];
     for (const countryCode of countryOrder) {
       const countryProviders = providers[countryCode];
@@ -124,7 +117,6 @@ async function searchAndDisplayMedia(query, mediaType) {
       return;
     }
 
-    // Remove duplicates
     const uniqueAvailability = availability.filter(
       (v, i, a) =>
         a.findIndex(
@@ -132,7 +124,6 @@ async function searchAndDisplayMedia(query, mediaType) {
         ) === i
     );
 
-    // Display the results
     console.log('Available on the following providers:\n');
     uniqueAvailability.forEach((item) => {
       console.log(
@@ -141,7 +132,6 @@ async function searchAndDisplayMedia(query, mediaType) {
     });
   }
 
-  // Ask if the user wants to request the media via Jellyseerr
   const { shouldRequest } = await inquirer.prompt([
     {
       type: 'confirm',
@@ -152,12 +142,6 @@ async function searchAndDisplayMedia(query, mediaType) {
   ]);
 
   if (shouldRequest) {
-    await requestMedia(mediaId, mediaType);
+    await requestMedia(mediaId, mediaType, title);
   }
-}
-
-async function requestMedia(mediaId, mediaType) {
-  // Implement the logic to request media via Jellyseerr
-  console.log(`Requesting ${mediaType} with ID ${mediaId} via Jellyseerr...`);
-  // Add your Jellyseerr API call here
 }

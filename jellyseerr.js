@@ -1,17 +1,23 @@
-// jellyseerr.js
-const axios = require('axios');
-require('dotenv').config();
+import axios from 'axios';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const JELLYSEERR_URL = process.env.JELLYSEERR_URL;
 const JELLYSEERR_API_KEY = process.env.JELLYSEERR_API_KEY;
 
-// Function to request media
-async function requestMedia(mediaId, mediaType) {
+export async function requestMedia(mediaId, mediaType, title) {
   const url = `${JELLYSEERR_URL}/api/v1/request`;
 
+  // Debugging: Log the payload and request URL
+  console.log('Making request to Jellyseerr with the following data:');
+  console.log(`URL: ${url}`);
+  console.log(`Payload:`, { mediaId, mediaType, title });
+
   const payload = {
-    mediaId: Number(mediaId),
-    mediaType,
+    mediaId: mediaId,
+    mediaType: mediaType === 'movie' ? 'movie' : 'tv',
+    title: title,
   };
 
   try {
@@ -28,10 +34,7 @@ async function requestMedia(mediaId, mediaType) {
       console.log('Failed to request media.');
     }
   } catch (error) {
-    console.error('Error requesting media:', error.message);
+    // Log the full error for better debugging
+    console.error('Error requesting media:', error.response ? error.response.data : error.message);
   }
 }
-
-module.exports = {
-  requestMedia,
-};
